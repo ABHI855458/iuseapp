@@ -304,8 +304,41 @@ document.querySelectorAll('nav.tabs button').forEach(b => b.onclick = () => { bu
 
 // ---------- 🔥 POLLS ----------
 let round = null, run = 0, given = Number(store.get('props-given-' + new Date().toDateString()) || 0);
+// ---------- demo mode (?demo): made-up classmates, nothing is sent ----------
+const DEMO = new URLSearchParams(location.search).has('demo');
+const DEMO_PEOPLE = [
+  ['Aarav Mehta', 'CSE', 2], ['Diya Rao', 'ISE', 2], ['Kabir Shetty', 'ECE', 3], ['Meera Iyer', 'CSE', 1],
+  ['Rohan Gowda', 'Mech', 3], ['Ananya Nair', 'AIML', 2], ['Vihaan Reddy', 'EEE', 1], ['Ishita Kulkarni', 'CSE-DS', 2],
+  ['Arjun Bhat', 'Civil', 4], ['Sara Thomas', 'Biotech', 2], ['Kiran Hegde', 'ISE', 3], ['Tara Menon', 'ECE', 1],
+].map(([name, branch, year], i) => ({ id: 'demo' + i, name, branch, year, photo: null }));
+const DEMO_QS = [
+  ['😂', 'Best laugh in RVCE'], ['📞', 'Who would you call at 2 am'], ['🌟', 'Most likely to become famous'], ['👟', 'Best fits in RVCE'],
+  ['✨', 'Main character energy'], ['🎧', 'Best music taste'], ['🤝', 'Easiest to talk to'], ['🎤', 'Would win a karaoke night'],
+  ['🚀', 'Will be a CEO one day'], ['🎉', 'Life of every party'], ['🦋', 'Glowed up the most this year'], ['🧳', 'Best travel buddy'],
+];
+const demoPick = (n, seed) => DEMO_PEOPLE.map((p, i) => [p, (i * 7 + seed * 13) % 23]).sort((a, b) => a[1] - b[1]).slice(0, n).map(x => x[0]);
+function demoRound() {
+  return { day: 'demo', people: DEMO_PEOPLE.length, streak: 3, questions: DEMO_QS.map(([emoji, text], i) => ({ id: i, emoji, text, options: demoPick(4, i + 1), picked: null })) };
+}
+function demoResult(q, chosenId) {
+  // Plausible campus split, with your pick counted.
+  const raw = q.options.map((o, i) => ({ id: o.id, n: 3 + ((q.id * 5 + i * 11) % 17) + (o.id === chosenId ? 1 : 0) }));
+  const total = raw.reduce((a, r) => a + r.n, 0);
+  return { ok: true, total, share: Object.fromEntries(raw.map(r => [r.id, Math.round(r.n / total * 100)])), streak: 3 };
+}
+function demoBoard() {
+  const levels = [[250, 'Legend', '👑'], [100, 'Icon', '💎'], [40, 'Hot', '🔥'], [15, 'Rising', '🚀'], [5, 'Noticed', '👀'], [0, 'Fresh', '🌱']];
+  const lvl = (a) => { const [at, name, emoji] = levels.find(l => a >= l[0]); return { at, name, emoji }; };
+  const auras = [312, 241, 188, 133, 97, 71, 52, 38, 24, 15, 9, 4];
+  return {
+    list: DEMO_PEOPLE.map((p, i) => ({ ...p, rank: i + 1, aura: auras[i], level: lvl(auras[i]), badges: [{ emoji: DEMO_QS[i][0], text: DEMO_QS[i][1], n: 9 }], me: false })),
+    crowns: DEMO_QS.slice(0, 6).map(([emoji, text], i) => ({ emoji, text, n: 31 - i * 4, person: DEMO_PEOPLE[(i * 5) % 12] })),
+  };
+}
+
 async function loadPolls() {
   const root = $('tab-polls'); root.replaceChildren(el('div', 'spin'));
+  if (DEMO) { round = demoRound(); renderPolls(); return; }
   try { round = await call(signedIn && me ? 'round' : 'g_round'); renderPolls(); }
   catch (e) { root.replaceChildren(el('p', 'sub', e.message)); }
 }
@@ -324,6 +357,7 @@ function renderPolls() {
     const m = el('button', 'skip', 'Meanwhile — talk to a random person 💬 →'); m.onclick = () => show('match');
     c.append(b, i, m); root.append(c); return;
   }
+  if (DEMO) root.append(el('p', 'small muted center', '🧪 Demo — made-up classmates, nothing is saved'));
   const idx = qs.findIndex(q => !q.picked && !q._skip);
   const top = el('div', 'bar2'); const prog = el('div', 'prog');
   qs.forEach(q => prog.append(el('i', q.picked || q._skip ? 'done' : ''))); top.append(prog);
@@ -354,7 +388,7 @@ function renderPolls() {
       const r = b.getBoundingClientRect(); burst(r.left + r.width / 2, r.top + r.height / 2);
       floatText(r.left + r.width / 2, r.top, `+1 aura → ${o.name.split(' ')[0]}`);
       let res;
-      try { res = await call(signedIn && me ? 'pick' : 'g_pick', { question_id: q.id, target_id: o.id, options: q.options.map(x => x.id) }); }
+      try { res = DEMO ? (await new Promise(r => setTimeout(r, 250)), demoResult(q, o.id)) : await call(signedIn && me ? 'pick' : 'g_pick', { question_id: q.id, target_id: o.id, options: q.options.map(x => x.id) }); }
       catch (e) { toast(e.message); btns.forEach(x => x.b.classList.remove('chosen', 'faded')); card._busy = false; return; }
       q.picked = o.id; run++; given++; store.set('props-given-' + new Date().toDateString(), String(given));
       if (run >= 3 && run % 3 === 0) { combo(['🔥 x' + run + ' combo', '⚡ on fire', '👑 unstoppable'][Math.min(2, run / 3 - 1)]); buzz([30, 30, 70]); }
@@ -495,8 +529,8 @@ let span = 'week';
 function openBoard() { buzz(); sheet((p, close) => { const body = el('div'); p.append(body); drawBoard(body, close); }); }
 async function drawBoard(root, close) {
   root.replaceChildren(el('div', 'spin'));
-  let d; try { d = await call('board', { span }); } catch (e) { root.replaceChildren(el('p', 'sub', e.message)); return; }
-  root.replaceChildren(el('div', 'h2', '🏆 Aura board · RVCE'), el('p', 'sub', 'Aura = how often campus picks you. Looks & crush picks never show here.'));
+  let d; try { d = DEMO ? demoBoard() : await call('board', { span }); } catch (e) { root.replaceChildren(el('p', 'sub', e.message)); return; }
+  root.replaceChildren(el('div', 'h2', '🏆 Aura board · RVCE' + (DEMO ? ' (demo)' : '')), el('p', 'sub', 'Aura = how often campus picks you. Looks & crush picks never show here.'));
   const seg = el('div', 'segbar');
   for (const [k, label] of [['today', 'Today'], ['week', 'Week'], ['all', 'All time']]) { const b = el('button', span === k ? 'on' : '', label); b.onclick = () => { span = k; buzz(); drawBoard(root, close); }; seg.append(b); }
   root.append(seg);
