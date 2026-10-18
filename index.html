@@ -214,6 +214,18 @@
   .camwrap video { transform: scaleX(-1); }
   .camwrap .ph { position: absolute; inset: 0; display: grid; place-items: center; font-size: 64px; }
   .me-av { width: 108px; height: 108px; border-radius: 50%; margin: 6px auto; background: #23232C center/cover; border: 3px solid var(--lime); display: grid; place-items: center; font-size: 40px; font-weight: 800; }
+  /* USN entry */
+  .gate { position: fixed; inset: 0; z-index: 50; overflow-y: auto; background: radial-gradient(110% 55% at 20% 0%, rgba(124,77,255,.4), transparent 60%), radial-gradient(90% 50% at 100% 100%, rgba(255,61,129,.22), transparent 60%), radial-gradient(70% 40% at 0% 100%, rgba(200,255,61,.12), transparent 60%), var(--bg); display: flex; flex-direction: column; justify-content: center; padding: calc(24px + env(safe-area-inset-top)) 22px calc(24px + env(safe-area-inset-bottom)); }
+  .gate .in { width: 100%; max-width: 420px; margin: 0 auto; position: relative; z-index: 1; animation: pop .45s cubic-bezier(.2,1.3,.4,1); }
+  .gate .logo { font-size: 34px; margin-bottom: 26px; }
+  .gate .big { font-family: var(--display); font-size: 38px; font-weight: 800; letter-spacing: -.04em; line-height: 1.04; margin: 0 0 12px; }
+  .usn { width: 100%; height: 68px; border-radius: 22px; border: 2px solid var(--line2); background: rgba(255,255,255,.06); color: #fff; font-family: var(--display); font-size: 24px; font-weight: 800; letter-spacing: .06em; text-align: center; outline: none; text-transform: uppercase; margin: 8px 0 12px; }
+  .usn:focus { border-color: var(--lime); box-shadow: 0 0 0 4px rgba(200,255,61,.15); }
+  .usn::placeholder { color: rgba(255,255,255,.25); }
+  .classtag { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; background: rgba(200,255,61,.12); color: var(--lime); font-weight: 800; font-size: 14px; margin-bottom: 12px; }
+  .adult { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); margin-bottom: 12px; width: 100%; text-align: left; }
+  .adult .t { flex: 1; font-weight: 700; } .adult .t span { display: block; font-size: 12.5px; color: var(--dim); font-weight: 600; }
+  .gate .fine { margin-top: 16px; font-size: 12.5px; color: var(--dim); text-align: center; line-height: 1.5; }
   .toast { position: fixed; left: 50%; bottom: calc(110px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 40; background: #fff; color: #07070A; font-weight: 800; padding: 12px 18px; border-radius: 999px; box-shadow: 0 10px 30px rgba(0,0,0,.4); opacity: 0; transition: opacity .2s; white-space: nowrap; max-width: 92vw; overflow: hidden; text-overflow: ellipsis; }
   .toast.on { opacity: 1; }
   .modal { position: fixed; inset: 0; z-index: 45; background: rgba(0,0,0,.84); display: grid; place-items: center; padding: 22px; overflow-y: auto; }
@@ -351,9 +363,9 @@ function renderPolls() {
   const qs = round.questions || [];
   if (!qs.length) {
     const c = el('div', 'card center'); const e = el('div', null, '🌱'); e.style.fontSize = '58px';
-    c.append(e, el('div', 'h2', 'Be the first on the board'), el('p', 'sub', `Polls start when a few people join — ${round.people} so far. Join in 20 seconds, then drop the link in your group.`));
-    const b = el('button', 'btn', 'Join the board 🔥'); b.onclick = openYou;
-    const i = el('button', 'btn ghost', 'Invite your group 👋'); i.style.marginTop = '10px'; i.onclick = invite;
+    c.append(e, el('div', 'h2', "Your class isn't here yet"), el('p', 'sub', `Polls start when a couple of classmates come in — ${round.people} at RVCE so far. Drop the link in your class group 👇`));
+    const b = el('button', 'btn', 'Send it to my class 👋'); b.onclick = invite;
+    const i = el('button', 'btn ghost', 'See the board 🏆'); i.style.marginTop = '10px'; i.onclick = openBoard;
     const m = el('button', 'skip', 'Meanwhile — talk to a random person 💬 →'); m.onclick = () => show('match');
     c.append(b, i, m); root.append(c); return;
   }
@@ -370,7 +382,6 @@ function renderPolls() {
     const a = el('button', 'btn', 'See the board 🏆'); a.onclick = openBoard;
     const b = el('button', 'btn ghost', 'Talk to someone random 💬'); b.style.marginTop = '10px'; b.onclick = () => show('match');
     c.append(a, b); root.append(c);
-    if (!signedIn || !me) root.append(joinCta('Want to know who picks YOU?', 'Join — your Aura climbs every time someone picks you.'));
     burst(innerWidth / 2, innerHeight / 3, ['🎉', '🔥', '✨', '👑'], 24); return;
   }
   const q = qs[idx];
@@ -559,13 +570,12 @@ async function drawBoard(root, close) {
       r.append(el('div', 'rk', String(pp.rank)), av, nm, el('div', 'au', `${pp.level.emoji} ${pp.aura}`)); root.append(r);
     }
   }
-  if (!signedIn || !me) { const j = joinCta('Get yourself on this board', 'Join in 20 seconds. Campus does the rest.'); j.onclick = () => { close(); openYou(); }; root.append(j); }
 }
 function openYou() { buzz(); sheet((p, close) => { const body = el('div'); p.append(body); drawYou(body, close); }); }
 async function drawYou(root, close) {
   root.replaceChildren();
-  if (!signedIn) return drawJoin(root, close);
-  if (!me) { close(); await onboarding(); await refreshMe(); if (!me) return; if (!me.photo_url) await photoStep(true); openYou(); loadPolls(); return; }
+  if (DEMO) { root.append(el('div', 'h2', '🧪 Demo'), el('p', 'sub', 'Open the site without ?demo and enter your USN to get your own Aura.')); return; }
+  if (!me) { close(); await showGate(); openYou(); loadPolls(); return; }
   root.append(el('div', 'spin'));
   let a; try { a = await call('aura'); } catch (e) { root.replaceChildren(el('p', 'sub', e.message)); return; }
   root.replaceChildren(); setAura(a.aura);
@@ -593,7 +603,7 @@ async function drawYou(root, close) {
   root.append(toggle('Flex my top titles', 'Show your best titles on your card in polls.', a.show_badges, (on) => call('flex', { on })));
   const ch = el('button', 'btn ghost', a.photo ? 'Change photo 📸' : 'Add your photo 📸'); ch.style.marginTop = '14px'; ch.onclick = async () => { close(); await photoStep(false); openYou(); };
   const inv = el('button', 'btn', 'Invite your group 👋'); inv.style.marginTop = '10px'; inv.onclick = invite;
-  const out = el('button', 'skip', 'Sign out'); out.onclick = async () => { await desk.auth.signOut(); location.reload(); };
+  const out = el('button', 'skip', 'Not you? Leave this phone'); out.onclick = async () => { await call('leave_device').catch(() => {}); await desk.auth.signOut().catch(() => {}); location.reload(); };
   const w = el('div', 'center'); w.append(out); root.append(ch, inv, w);
 }
 function toggle(title, sub, on, onChange) {
@@ -727,12 +737,81 @@ function photoStep(first) {
 
 
 
+// ---------- 🎓 come in with your USN ----------
+const USN_RE = /^1R[VZ](\d{2})B?([A-Z]{2,3})(\d{3})$/;
+const BR = { CS: 'CSE', IS: 'ISE', EC: 'ECE', EE: 'EEE', EI: 'EIE', ET: 'ETE', ME: 'Mech', CV: 'Civil', CH: 'Chemical', BT: 'Biotech', IM: 'IEM', AS: 'Aero', CI: 'AIML', CD: 'CSE-DS', CY: 'CSE-Cyber' };
+function classOf(usn) {
+  const m = USN_RE.exec(usn); if (!m || !BR[m[2]]) return null;
+  const now = new Date(); const start = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
+  const y = Math.min(5, Math.max(1, start - (2000 + Number(m[1])) + 1));
+  return `${BR[m[2]]} · ${['1st', '2nd', '3rd', '4th', '5th'][y - 1]} year`;
+}
+function showGate() {
+  return new Promise((resolve) => {
+    const g = el('div', 'gate'); const box = el('div', 'in');
+    const logo = el('div', 'logo'); logo.append(el('b', null, 'props'));
+    const big = el('div', 'big'); big.append('Who does '); big.append(el('span', 'hot', 'your class')); big.append(' think is the best?');
+    const sub = el('p', 'sub', 'Vote on your classmates anonymously. Match with a random person on campus. Enter your USN to come in.');
+    const usn = el('input', 'usn'); usn.placeholder = '1RV25CS001'; usn.maxLength = 12; usn.autocapitalize = 'characters'; usn.autocomplete = 'off'; usn.spellcheck = false; usn.inputMode = 'text';
+    const tag = el('div', 'classtag hidden');
+    const extra = el('div', 'hidden');
+    const name = el('input', 'field'); name.placeholder = 'Your name (as friends know you)'; name.maxLength = 40; name.autocomplete = 'given-name';
+    let gender = null; const seg = el('div', 'seg');
+    for (const [k, label] of [['f', 'Girl 💅'], ['m', 'Guy 🔥']]) { const b = el('button', null, label); b.onclick = () => { gender = k; buzz(); seg.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); }; seg.append(b); }
+    let adult = null; const ad = el('button', 'adult'); const at = el('div', 't', "I'm 18 or older"); at.append(el('span', null, 'Unlocks the spicy polls (looks, crushes). Those never show publicly.'));
+    const sw = el('div', 'sw'); ad.append(at, sw); ad.onclick = () => { adult = !adult; sw.classList.toggle('on', adult); buzz(); };
+    const err = el('div', 'err');
+    const go = el('button', 'btn', 'Come in →');
+    let need = null; // null | 'profile' | 'name'
+    usn.oninput = () => {
+      usn.value = usn.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      const c = classOf(usn.value); tag.classList.toggle('hidden', !c); tag.textContent = c ? '🎓 ' + c : '';
+      if (need) { need = null; extra.classList.add('hidden'); go.textContent = 'Come in →'; }
+    };
+    const submit = async () => {
+      err.textContent = '';
+      if (!classOf(usn.value)) { err.textContent = 'Type your RVCE USN, like 1RV25CS001'; usn.classList.add('shake'); setTimeout(() => usn.classList.remove('shake'), 400); return; }
+      const payload = { usn: usn.value };
+      if (need) {
+        if (name.value.trim().length < 2) { err.textContent = need === 'name' ? 'Type your first name' : 'Type your name'; return; }
+        payload.name = name.value;
+        if (need === 'profile') {
+          if (!gender) { err.textContent = 'Pick girl or guy'; return; }
+          payload.gender = gender; payload.adult = adult === true;
+        }
+      }
+      go.disabled = true; const label = go.textContent; go.textContent = 'One sec…';
+      try {
+        const d = await call('usn_join', payload);
+        if (d.need) {
+          need = d.need; extra.replaceChildren(name);
+          if (need === 'profile') { extra.prepend(el('div', 'lbl', 'FIRST TIME? 10 SECONDS')); extra.append(el('div', 'lbl', 'YOU ARE'), seg, ad); }
+          else extra.prepend(el('div', 'lbl', 'WELCOME BACK — YOUR FIRST NAME?'));
+          extra.classList.remove('hidden'); go.textContent = need === 'profile' ? "Let's go 🔥" : 'Come in →'; name.focus(); return;
+        }
+        me = d.me; signedIn = true; buzz([30, 40, 80]);
+        burst(innerWidth / 2, innerHeight / 2, ['🎓', '🔥', '✨', '⚡'], 24);
+        g.remove(); resolve(d.created);
+      } catch (e) { err.textContent = e.message; }
+      finally { go.disabled = false; if (go.textContent === 'One sec…') go.textContent = label; }
+    };
+    go.onclick = submit;
+    for (const i of [usn, name]) i.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+    box.append(logo, big, sub, usn, tag, extra, err, go, el('div', 'fine', 'Your USN is never shown to anyone — it only sets your class. Votes are 100% anonymous.'));
+    g.append(box); document.body.append(g); setTimeout(() => usn.focus(), 300);
+  });
+}
+
 // ---------- boot ----------
 (async function boot() {
-  const { data: { session } } = await desk.auth.getSession();
-  signedIn = !!session;
-  if (signedIn) await refreshMe();
-  if (signedIn && me) { try { const a = await call('aura'); setAura(a.aura); if (a.today) toast(`🚀 ${a.today} new pick${a.today > 1 ? 's' : ''} today`); } catch (_) {} }
+  if (DEMO) { show(location.hash.replace('#', '') || 'polls'); return; }
+  try { const r = await call('me'); me = r.me; } catch (_) { me = null; }
+  if (!me) {
+    const created = await showGate();
+    if (created && !me.photo_url) await photoStep(true);
+  }
+  signedIn = true;
+  try { const a = await call('aura'); setAura(a.aura); if (a.today) toast(`🚀 ${a.today} new pick${a.today > 1 ? 's' : ''} today`); } catch (_) {}
   show(location.hash.replace('#', '') || 'polls');
 })();
 </script>
